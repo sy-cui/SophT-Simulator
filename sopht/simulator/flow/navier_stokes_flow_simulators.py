@@ -3,10 +3,17 @@ import numpy as np
 from .flow_simulators import FlowSimulator
 from .passive_transport_flow_simulators import (
     compute_advection_diffusion_stable_timestep,
+    compute_stable_advection_relaxed_diffusion_timestep,
 )
 import sopht.numeric.eulerian_grid_ops as spne
 import sopht.utils as spu
 from typing import Callable, Literal
+from sopht.numeric.eulerian_grid_ops.stencil_ops_2d.diffusion_fft_2d import (
+    DiffusionDST2D,
+)
+from sopht.numeric.eulerian_grid_ops.stencil_ops_3d.diffusion_fft_3d import (
+    DiffusionDST3D,
+)
 
 
 class UnboundedNavierStokesFlowSimulator2D(FlowSimulator):
@@ -23,6 +30,7 @@ class UnboundedNavierStokesFlowSimulator2D(FlowSimulator):
         time: float = 0.0,
         with_forcing: bool = False,
         with_free_stream_flow: bool = False,
+        use_spectral_diffusion: bool = False,
         **kwargs,
     ) -> None:
         """Class initialiser
@@ -36,6 +44,7 @@ class UnboundedNavierStokesFlowSimulator2D(FlowSimulator):
         :param time: simulator time at initialisation
         :param with_forcing: flag indicating presence of body forcing
         :param with_free_stream_flow: flag indicating presence of free stream flow
+        :param with_spectral_diffusion: flag indicating usage of spectral diffusion
 
         Notes
         -----
@@ -45,6 +54,7 @@ class UnboundedNavierStokesFlowSimulator2D(FlowSimulator):
         self.cfl = cfl
         self.with_forcing = with_forcing
         self.with_free_stream_flow = with_free_stream_flow
+        self.use_spectral_diffusion = use_spectral_diffusion
         self.penalty_zone_width = kwargs.get("penalty_zone_width", 2)
         super().__init__(
             grid_dim=2,
@@ -71,13 +81,24 @@ class UnboundedNavierStokesFlowSimulator2D(FlowSimulator):
 
     def _compile_kernels(self) -> None:
         """Compile necessary kernels based on simulator flags"""
-        self._diffusion_timestep = (
-            spne.gen_diffusion_timestep_euler_forward_pyst_kernel_2d(
-                real_t=self.real_t,
-                fixed_grid_size=self.grid_size,
+        if self.use_spectral_diffusion:
+            self._diffusion_spectral_timestep = DiffusionDST2D(
+                flow_dx=self.dx,
+                grid_size=self.grid_size,
+                kinematic_viscosity=self.kinematic_viscosity,
                 num_threads=self.num_threads,
+                real_t=self.real_t,
             )
-        )
+
+        else:
+            self._diffusion_timestep = (
+                spne.gen_diffusion_timestep_euler_forward_pyst_kernel_2d(
+                    real_t=self.real_t,
+                    fixed_grid_size=self.grid_size,
+                    num_threads=self.num_threads,
+                )
+            )
+
         self._advection_timestep = (
             spne.gen_advection_timestep_euler_forward_conservative_eno3_pyst_kernel_2d(
                 real_t=self.real_t,
@@ -165,11 +186,19 @@ class UnboundedNavierStokesFlowSimulator2D(FlowSimulator):
             dt_by_dx=self.real_t(dt / self.dx),
         )
         # diffusion vorticity
-        self._diffusion_timestep(
-            field=self.vorticity_field,
-            diffusion_flux=self.buffer_scalar_field,
-            nu_dt_by_dx2=self.real_t(self.kinematic_viscosity * dt / self.dx / self.dx),
-        )
+        if self.use_spectral_diffusion:
+            self._diffusion_spectral_timestep.diffusion_timestep_dst(
+                field=self.vorticity_field,
+                flow_dt=dt,
+            )
+        else:
+            self._diffusion_timestep(
+                field=self.vorticity_field,
+                diffusion_flux=self.buffer_scalar_field,
+                nu_dt_by_dx2=self.real_t(
+                    self.kinematic_viscosity * dt / self.dx / self.dx
+                ),
+            )
         # compute velocity from vorticity
         self._penalise_field_towards_boundary(field=self.vorticity_field)
         self._unbounded_poisson_solver.solve(
@@ -200,15 +229,26 @@ class UnboundedNavierStokesFlowSimulator2D(FlowSimulator):
 
     def compute_stable_timestep(self, dt_prefac: float = 1.0) -> float:
         """Compute upper limit for stable time-stepping."""
-        dt = compute_advection_diffusion_stable_timestep(
-            velocity_field=self.velocity_field,
-            velocity_magnitude_field=self.buffer_scalar_field,
-            grid_dim=self.grid_dim,
-            dx=self.dx,
-            cfl=self.cfl,
-            kinematic_viscosity=self.kinematic_viscosity,
-            real_t=self.real_t,
-        )
+        if self.use_spectral_diffusion:
+            dt = compute_stable_advection_relaxed_diffusion_timestep(
+                velocity_field=self.velocity_field,
+                velocity_magnitude_field=self.buffer_scalar_field,
+                grid_dim=self.grid_dim,
+                dx=self.dx,
+                cfl=self.cfl,
+                kinematic_viscosity=self.kinematic_viscosity,
+                real_t=self.real_t,
+            )
+        else:
+            dt = compute_advection_diffusion_stable_timestep(
+                velocity_field=self.velocity_field,
+                velocity_magnitude_field=self.buffer_scalar_field,
+                grid_dim=self.grid_dim,
+                dx=self.dx,
+                cfl=self.cfl,
+                kinematic_viscosity=self.kinematic_viscosity,
+                real_t=self.real_t,
+            )
         return dt * dt_prefac
 
 
@@ -226,6 +266,7 @@ class UnboundedNavierStokesFlowSimulator3D(FlowSimulator):
         time: float = 0.0,
         with_forcing: bool = False,
         with_free_stream_flow: bool = False,
+        use_spectral_diffusion: bool = False,
         filter_vorticity: bool = False,
         poisson_solver_type: Literal[
             "greens_function_convolution", "fast_diagonalisation"
@@ -243,6 +284,7 @@ class UnboundedNavierStokesFlowSimulator3D(FlowSimulator):
         :param time: simulator time at initialisation
         :param with_forcing: flag indicating presence of body forcing
         :param with_free_stream_flow: flag indicating presence of free stream flow
+        :param with_spectral_diffusion: flag indicating usage of spectral diffusion
         :param filter_vorticity: flag to determine if vorticity should be filtered or not,
         needed for stability sometimes
         :param poisson_solver_type: Type of the poisson solver algorithm, can be
@@ -256,6 +298,7 @@ class UnboundedNavierStokesFlowSimulator3D(FlowSimulator):
         self.cfl = cfl
         self.with_forcing = with_forcing
         self.with_free_stream_flow = with_free_stream_flow
+        self.use_spectral_diffusion = use_spectral_diffusion
         self.penalty_zone_width = kwargs.get("penalty_zone_width", 2)
         self.filter_vorticity = filter_vorticity
         if self.filter_vorticity:
@@ -312,14 +355,24 @@ class UnboundedNavierStokesFlowSimulator3D(FlowSimulator):
 
     def _compile_kernels(self) -> None:
         """Compile necessary kernels based on 3D simulator flags"""
-        self._diffusion_timestep = (
-            spne.gen_diffusion_timestep_euler_forward_pyst_kernel_3d(
-                real_t=self.real_t,
-                fixed_grid_size=self.grid_size,
+        if self.use_spectral_diffusion:
+            self._diffusion_spectral_timestep = DiffusionDST3D(
+                flow_dx=self.dx,
+                grid_size=self.grid_size,
+                kinematic_viscosity=self.kinematic_viscosity,
                 num_threads=self.num_threads,
-                field_type="vector",
+                real_t=self.real_t,
             )
-        )
+
+        else:
+            self._diffusion_timestep = (
+                spne.gen_diffusion_timestep_euler_forward_pyst_kernel_3d(
+                    real_t=self.real_t,
+                    fixed_grid_size=self.grid_size,
+                    num_threads=self.num_threads,
+                    field_type="vector",
+                )
+            )
         grid_size_z, grid_size_y, grid_size_x = self.grid_size
         self._unbounded_poisson_solver: spne.UnboundedPoissonSolverPYFFTW3D | spne.FastDiagPoissonSolver3D
         if self.poisson_solver_type == "greens_function_convolution":
@@ -454,11 +507,21 @@ class UnboundedNavierStokesFlowSimulator3D(FlowSimulator):
             prefactor=self.real_t(dt / (2 * self.dx)),
         )
         # diffuse vorticity
-        self._diffusion_timestep(
-            vector_field=self.vorticity_field,
-            diffusion_flux=self.buffer_scalar_field,
-            nu_dt_by_dx2=self.real_t(self.kinematic_viscosity * dt / self.dx / self.dx),
-        )
+        if self.use_spectral_diffusion:
+            self._diffusion_spectral_timestep.diffusion_timestep_dst(
+                vector_field=self.vorticity_field,
+                flow_dt=dt,
+            )
+
+        else:
+            self._diffusion_timestep(
+                vector_field=self.vorticity_field,
+                diffusion_flux=self.buffer_scalar_field,
+                nu_dt_by_dx2=self.real_t(
+                    self.kinematic_viscosity * dt / self.dx / self.dx
+                ),
+            )
+
         # filter vorticity for stability
         self._filter_vector_field(vector_field=self.vorticity_field)
         # compute velocity from vorticity
@@ -493,15 +556,26 @@ class UnboundedNavierStokesFlowSimulator3D(FlowSimulator):
 
     def compute_stable_timestep(self, dt_prefac: float = 1.0) -> float:
         """Compute upper limit for stable time-stepping."""
-        dt = compute_advection_diffusion_stable_timestep(
-            velocity_field=self.velocity_field,
-            velocity_magnitude_field=self.buffer_scalar_field,
-            grid_dim=self.grid_dim,
-            dx=self.dx,
-            cfl=self.cfl,
-            kinematic_viscosity=self.kinematic_viscosity,
-            real_t=self.real_t,
-        )
+        if self.use_spectral_diffusion:
+            dt = compute_stable_advection_relaxed_diffusion_timestep(
+                velocity_field=self.velocity_field,
+                velocity_magnitude_field=self.buffer_scalar_field,
+                grid_dim=self.grid_dim,
+                dx=self.dx,
+                cfl=self.cfl,
+                kinematic_viscosity=self.kinematic_viscosity,
+                real_t=self.real_t,
+            )
+        else:
+            dt = compute_advection_diffusion_stable_timestep(
+                velocity_field=self.velocity_field,
+                velocity_magnitude_field=self.buffer_scalar_field,
+                grid_dim=self.grid_dim,
+                dx=self.dx,
+                cfl=self.cfl,
+                kinematic_viscosity=self.kinematic_viscosity,
+                real_t=self.real_t,
+            )
         return dt * dt_prefac
 
     def get_vorticity_divergence_l2_norm(self) -> float:

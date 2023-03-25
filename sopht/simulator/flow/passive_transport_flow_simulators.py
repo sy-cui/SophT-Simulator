@@ -145,3 +145,21 @@ def compute_advection_diffusion_stable_timestep(
         0.9 * dx**2 / (2 * grid_dim) / kinematic_viscosity + tol,
     )
     return dt
+
+
+def compute_stable_advection_relaxed_diffusion_timestep(
+    velocity_field: np.ndarray,
+    velocity_magnitude_field: np.ndarray,
+    grid_dim: int,
+    dx: float,
+    cfl: float,
+    kinematic_viscosity: float,
+    real_t: type = np.float32,
+) -> float:
+    tol = 10 * np.finfo(real_t).eps
+    velocity_magnitude_field[...] = np.sum(np.fabs(velocity_field), axis=0)
+    dt = min(
+        cfl * dx / (np.amax(velocity_magnitude_field) + tol),
+        2.0 * dx**2 / (2 * grid_dim) / kinematic_viscosity + tol,
+    )
+    return dt
