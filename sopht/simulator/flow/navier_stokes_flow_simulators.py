@@ -227,7 +227,11 @@ class UnboundedNavierStokesFlowSimulator2D(FlowSimulator):
             vector_field=self.eul_grid_forcing_field, fixed_vals=[0.0] * self.grid_dim
         )
 
-    def compute_stable_timestep(self, dt_prefac: float = 1.0) -> float:
+    def compute_stable_timestep(
+        self,
+        dt_prefac: float = 1.0,
+        diffusion_dt_limit_prefac: float = 2.0,
+    ) -> float:
         """Compute upper limit for stable time-stepping."""
         if self.use_spectral_diffusion:
             dt = compute_stable_advection_relaxed_diffusion_timestep(
@@ -237,6 +241,7 @@ class UnboundedNavierStokesFlowSimulator2D(FlowSimulator):
                 dx=self.dx,
                 cfl=self.cfl,
                 kinematic_viscosity=self.kinematic_viscosity,
+                diffusion_dt_limit_prefac=diffusion_dt_limit_prefac,
                 real_t=self.real_t,
             )
         else:
@@ -554,7 +559,11 @@ class UnboundedNavierStokesFlowSimulator3D(FlowSimulator):
             vector_field=self.eul_grid_forcing_field, fixed_vals=[0.0] * self.grid_dim
         )
 
-    def compute_stable_timestep(self, dt_prefac: float = 1.0) -> float:
+    def compute_stable_timestep(
+        self,
+        dt_prefac: float = 1.0,
+        diffusion_dt_limit_prefac: float = 2.0,
+    ) -> float:
         """Compute upper limit for stable time-stepping."""
         if self.use_spectral_diffusion:
             dt = compute_stable_advection_relaxed_diffusion_timestep(
@@ -564,6 +573,7 @@ class UnboundedNavierStokesFlowSimulator3D(FlowSimulator):
                 dx=self.dx,
                 cfl=self.cfl,
                 kinematic_viscosity=self.kinematic_viscosity,
+                diffusion_dt_limit_prefac=diffusion_dt_limit_prefac,
                 real_t=self.real_t,
             )
         else:
