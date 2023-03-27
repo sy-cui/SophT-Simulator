@@ -135,6 +135,7 @@ def immersed_magnetic_cilia_carpet_case(
     period_timer_limit = cilia_carpet_simulator.period
     foto_timer_limit = cilia_carpet_simulator.period / 20
     time_history = []
+    dt_limit_is_advection = []
     no_period = 0
 
     # create fig for plotting flow fields
@@ -216,6 +217,7 @@ def immersed_magnetic_cilia_carpet_case(
 
         # compute timestep
         flow_dt = flow_sim.compute_stable_timestep(dt_prefac=0.25)
+        dt_limit_is_advection.append(flow_sim.dt_limit_type == "advection")
 
         # Average velocity / vorticity field
         elemenwise_saxpby(
@@ -260,6 +262,8 @@ def immersed_magnetic_cilia_carpet_case(
     spu.make_video_from_image_series(
         video_name="flow", image_series_name="snap", frame_rate=10
     )
+
+    np.savetxt("dt_limit_is_advection.txt", dt_limit_is_advection, delimiter=",")
 
 
 def run_immersed_magnetic_cilia_carpet(
