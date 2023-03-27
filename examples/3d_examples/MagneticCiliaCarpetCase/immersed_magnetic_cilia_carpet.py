@@ -12,6 +12,7 @@ def immersed_magnetic_cilia_carpet_case(
     grid_size_x: int,
     coupling_stiffness: float = -2e4,
     coupling_damping: float = -1e1,
+    diffusion_dt_limit_prefac: float = 2.0,
     num_threads: int = 4,
     precision: str = "single",
     save_data: bool = False,
@@ -216,7 +217,10 @@ def immersed_magnetic_cilia_carpet_case(
             no_period += 1
 
         # compute timestep
-        flow_dt = flow_sim.compute_stable_timestep(dt_prefac=0.25)
+        flow_dt = flow_sim.compute_stable_timestep(
+            dt_prefac=0.25,
+            diffusion_dt_limit_prefac=diffusion_dt_limit_prefac,
+        )
         dt_limit_is_advection.append(flow_sim.dt_limit_type == "advection")
 
         # Average velocity / vorticity field
@@ -282,6 +286,7 @@ def run_immersed_magnetic_cilia_carpet(
     num_threads: int = 4,
     coupling_stiffness: float = -2e4,
     coupling_damping: float = -1e1,
+    diffusion_dt_limit_prefac: float = 2.0,
     use_spectral_diffusion=False,
     precision: str = "single",
     save_data: bool = False,
@@ -322,6 +327,7 @@ def run_immersed_magnetic_cilia_carpet(
         num_threads=num_threads,
         coupling_stiffness=coupling_stiffness,
         coupling_damping=coupling_damping,
+        diffusion_dt_limit_prefac=diffusion_dt_limit_prefac,
         use_spectral_diffusion=use_spectral_diffusion,
         precision=precision,
         save_data=save_data,
