@@ -56,6 +56,11 @@ class UnboundedNavierStokesFlowSimulator2D(FlowSimulator):
         self.with_free_stream_flow = with_free_stream_flow
         self.use_spectral_diffusion = use_spectral_diffusion
         self.penalty_zone_width = kwargs.get("penalty_zone_width", 2)
+        self.dt_limit_dict: dict[Literal["advection", "diffusion"], float] = {
+            "advection": 0.0,
+            "diffusion": 0.0,
+        }
+        self.dt_limit_type: Literal["advection", "diffusion"] = "diffusion"
         super().__init__(
             grid_dim=2,
             grid_size=grid_size,
@@ -234,7 +239,11 @@ class UnboundedNavierStokesFlowSimulator2D(FlowSimulator):
     ) -> float:
         """Compute upper limit for stable time-stepping."""
         if self.use_spectral_diffusion:
-            dt = compute_stable_advection_relaxed_diffusion_timestep(
+            (
+                self.dt_limit_type,
+                dt,
+            ) = compute_stable_advection_relaxed_diffusion_timestep(
+                dt_limit_dict=self.dt_limit_dict,
                 velocity_field=self.velocity_field,
                 velocity_magnitude_field=self.buffer_scalar_field,
                 grid_dim=self.grid_dim,
@@ -245,7 +254,8 @@ class UnboundedNavierStokesFlowSimulator2D(FlowSimulator):
                 real_t=self.real_t,
             )
         else:
-            dt = compute_advection_diffusion_stable_timestep(
+            self.dt_limit_type, dt = compute_advection_diffusion_stable_timestep(
+                dt_limit_dict=self.dt_limit_dict,
                 velocity_field=self.velocity_field,
                 velocity_magnitude_field=self.buffer_scalar_field,
                 grid_dim=self.grid_dim,
@@ -306,6 +316,11 @@ class UnboundedNavierStokesFlowSimulator3D(FlowSimulator):
         self.use_spectral_diffusion = use_spectral_diffusion
         self.penalty_zone_width = kwargs.get("penalty_zone_width", 2)
         self.filter_vorticity = filter_vorticity
+        self.dt_limit_dict: dict[Literal["advection", "diffusion"], float] = {
+            "advection": 0.0,
+            "diffusion": 0.0,
+        }
+        self.dt_limit_type: Literal["advection", "diffusion"] = "diffusion"
         if self.filter_vorticity:
             log = logging.getLogger()
             log.warning(
@@ -566,7 +581,11 @@ class UnboundedNavierStokesFlowSimulator3D(FlowSimulator):
     ) -> float:
         """Compute upper limit for stable time-stepping."""
         if self.use_spectral_diffusion:
-            dt = compute_stable_advection_relaxed_diffusion_timestep(
+            (
+                self.dt_limit_type,
+                dt,
+            ) = compute_stable_advection_relaxed_diffusion_timestep(
+                dt_limit_dict=self.dt_limit_dict,
                 velocity_field=self.velocity_field,
                 velocity_magnitude_field=self.buffer_scalar_field,
                 grid_dim=self.grid_dim,
@@ -577,7 +596,8 @@ class UnboundedNavierStokesFlowSimulator3D(FlowSimulator):
                 real_t=self.real_t,
             )
         else:
-            dt = compute_advection_diffusion_stable_timestep(
+            self.dt_limit_type, dt = compute_advection_diffusion_stable_timestep(
+                dt_limit_dict=self.dt_limit_dict,
                 velocity_field=self.velocity_field,
                 velocity_magnitude_field=self.buffer_scalar_field,
                 grid_dim=self.grid_dim,

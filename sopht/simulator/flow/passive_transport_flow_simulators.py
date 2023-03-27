@@ -46,6 +46,11 @@ class PassiveTransportFlowSimulator(FlowSimulator):
         self.kinematic_viscosity = kinematic_viscosity
         self.cfl = cfl
         self.field_type = field_type
+        self.dt_limit_dict: dict[Literal["advection", "diffusion"], float] = {
+            "advection": 0.0,
+            "diffusion": 0.0,
+        }
+        self.dt_limit_type: Literal["advection", "diffusion"] = "diffusion"
         super().__init__(grid_dim, grid_size, x_range, real_t, num_threads, time)
 
     def _init_fields(self) -> None:
@@ -115,7 +120,8 @@ class PassiveTransportFlowSimulator(FlowSimulator):
 
     def compute_stable_timestep(self, dt_prefac: float = 1.0) -> float:
         """Compute upper limit for stable time-stepping."""
-        dt = compute_advection_diffusion_stable_timestep(
+        self.dt_limit_type, dt = compute_advection_diffusion_stable_timestep(
+            dt_limit_dict=self.dt_limit_dict,
             velocity_field=self.velocity_field,
             velocity_magnitude_field=self.buffer_scalar_field,
             grid_dim=self.grid_dim,
@@ -128,6 +134,7 @@ class PassiveTransportFlowSimulator(FlowSimulator):
 
 
 def compute_advection_diffusion_stable_timestep(
+    dt_limit_dict: dict[Literal["advection", "diffusion"], float],
     velocity_field: np.ndarray,
     velocity_magnitude_field: np.ndarray,
     grid_dim: int,
@@ -135,19 +142,24 @@ def compute_advection_diffusion_stable_timestep(
     cfl: float,
     kinematic_viscosity: float,
     real_t: type = np.float32,
-) -> float:
+) -> tuple[Literal["advection", "diffusion"], float]:
     """Compute stable timestep based on advection and diffusion limits."""
     # This may need a numba or pystencil version
     tol = 10 * np.finfo(real_t).eps
     velocity_magnitude_field[...] = np.sum(np.fabs(velocity_field), axis=0)
-    dt = min(
-        cfl * dx / (np.amax(velocity_magnitude_field) + tol),
-        0.9 * dx**2 / (2 * grid_dim) / kinematic_viscosity + tol,
+
+    dt_limit_dict["advection"] = float(
+        cfl * dx / (np.amax(velocity_magnitude_field) + tol)
     )
-    return dt
+    dt_limit_dict["diffusion"] = float(
+        0.9 * dx**2 / (2 * grid_dim) / kinematic_viscosity + tol
+    )
+
+    return min(dt_limit_dict.items(), key=lambda x: x[1])
 
 
 def compute_stable_advection_relaxed_diffusion_timestep(
+    dt_limit_dict: dict[Literal["advection", "diffusion"], float],
     velocity_field: np.ndarray,
     velocity_magnitude_field: np.ndarray,
     grid_dim: int,
@@ -156,12 +168,15 @@ def compute_stable_advection_relaxed_diffusion_timestep(
     kinematic_viscosity: float,
     diffusion_dt_limit_prefac: float = 2.0,
     real_t: type = np.float32,
-) -> float:
+) -> tuple[Literal["advection", "diffusion"], float]:
     tol = 10 * np.finfo(real_t).eps
     velocity_magnitude_field[...] = np.sum(np.fabs(velocity_field), axis=0)
-    dt = min(
-        cfl * dx / (np.amax(velocity_magnitude_field) + tol),
-        diffusion_dt_limit_prefac * dx**2 / (2 * grid_dim) / kinematic_viscosity
-        + tol,
+
+    dt_limit_dict["advection"] = float(
+        cfl * dx / (np.amax(velocity_magnitude_field) + tol)
     )
-    return dt
+    dt_limit_dict["diffusion"] = float(
+        diffusion_dt_limit_prefac * dx**2 / (2 * grid_dim) / kinematic_viscosity + tol
+    )
+
+    return min(dt_limit_dict.items(), key=lambda x: x[1])
