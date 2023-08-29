@@ -1,7 +1,9 @@
 import elastica as ea
 import numpy as np
-from sopht.simulator import (
+from sopht.simulator.immersed_body.immersed_body_forcing_grid import (
     ImmersedBodyForcingGrid,
+)
+from sopht.simulator.immersed_body.PenaltyBoundaryForcing import (
     PenaltyBoundaryForcing,
 )
 from typing import Type, Optional, Literal
