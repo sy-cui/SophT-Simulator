@@ -1,13 +1,13 @@
 import elastica as ea
 import numpy as np
-from sopht.simulator.immersed_body import (
+from sopht.simulator import (
     ImmersedBodyForcingGrid,
-    ImmersedBodyFlowInteraction,
+    PenaltyBoundaryForcing,
 )
-from typing import Type, Optional
+from typing import Type, Optional, Literal
 
 
-class CosseratRodFlowInteraction(ImmersedBodyFlowInteraction):
+class CosseratRodFlowInteraction(PenaltyBoundaryForcing):
     """Class for Cosserat rod flow interaction."""
 
     def __init__(
@@ -22,10 +22,11 @@ class CosseratRodFlowInteraction(ImmersedBodyFlowInteraction):
         forcing_grid_cls: Type[ImmersedBodyForcingGrid],
         real_t: type = np.float64,
         eul_grid_coord_shift: Optional[float] = None,
-        interp_kernel_width: Optional[float] = None,
+        interp_kernel_width: int = 2,
         enable_eul_grid_forcing_reset: bool = False,
         num_threads: int | bool = False,
         start_time: float = 0.0,
+        interp_kernel_type: Literal["peskin", "cosine"] = "cosine",
         **forcing_grid_kwargs,
     ) -> None:
         """Class initialiser."""
@@ -39,20 +40,19 @@ class CosseratRodFlowInteraction(ImmersedBodyFlowInteraction):
 
         # initialising super class
         super().__init__(
-            eul_grid_forcing_field,
-            eul_grid_velocity_field,
-            body_flow_forces,
-            body_flow_torques,
-            forcing_grid_cls,
-            virtual_boundary_stiffness_coeff,
-            virtual_boundary_damping_coeff,
-            dx,
-            grid_dim,
-            real_t,
-            eul_grid_coord_shift,
-            interp_kernel_width,
-            enable_eul_grid_forcing_reset,
-            num_threads,
-            start_time,
+            virtual_boundary_stiffness_coeff=virtual_boundary_stiffness_coeff,
+            virtual_boundary_damping_coeff=virtual_boundary_damping_coeff,
+            grid_dim=grid_dim,
+            dx=dx,
+            eul_grid_forcing_field=eul_grid_forcing_field,
+            eul_grid_velocity_field=eul_grid_velocity_field,
+            forcing_grid_cls=forcing_grid_cls,
+            body_flow_forces=body_flow_forces,
+            body_flow_torques=body_flow_torques,
+            real_t=real_t,
+            eul_grid_coord_shift=eul_grid_coord_shift,
+            interp_kernel_width=interp_kernel_width,
+            start_time=start_time,
+            interp_kernel_type=interp_kernel_type,
             **forcing_grid_kwargs,
         )
