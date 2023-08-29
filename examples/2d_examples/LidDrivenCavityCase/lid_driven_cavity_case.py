@@ -38,7 +38,7 @@ def lid_driven_cavity_case(
     # Initialize lid driven cavity forcing grid
     num_lag_nodes_per_side = grid_size[x_axis_idx] * 3 // 8
     ldc_com = (0.5, 0.5)
-    ldc_flow_interactor = sps.ImmersedBodyFlowInteraction(
+    ldc_flow_interactor = sps.PenaltyBoundaryForcing(
         eul_grid_forcing_field=flow_sim.eul_grid_forcing_field,
         eul_grid_velocity_field=flow_sim.velocity_field,
         body_flow_forces=np.zeros((grid_dim, 1)),
