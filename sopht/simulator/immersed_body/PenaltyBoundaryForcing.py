@@ -66,7 +66,7 @@ class PenaltyBoundaryForcing(ImmersedBoundaryInteraction):
         eul_grid_coord_shift: float, optional
             Shift of the Eulerian grid coordinate from 0. This is usually
             dx / 2, which is automatically enforced if no value is provided.
-        interp_kernel_width: int, optional
+        interp_kernel_width: int
             Width of the interpolation kernel. Defaults to 2.
         start_time: float
             Start time of the simulation. Defaults to 0.0.
