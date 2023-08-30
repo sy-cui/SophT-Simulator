@@ -114,7 +114,6 @@ def immersed_flexible_pendulum_with_rigid_cylinder_case(
         grid_dim=grid_dim,
         forcing_grid_cls=sps.CosseratRodElementCentricForcingGrid,
         real_t=real_t,
-        num_threads=num_threads,
     )
     if rod_coupling_type == "two_way":
         pendulum_sim.add_forcing_to(pendulum_rod).using(

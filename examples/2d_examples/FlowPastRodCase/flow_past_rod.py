@@ -122,7 +122,6 @@ def flow_past_rod_case(
         grid_dim=grid_dim,
         forcing_grid_cls=sps.CosseratRodElementCentricForcingGrid,
         real_t=real_t,
-        num_threads=num_threads,
     )
     flow_past_sim.add_forcing_to(flow_past_rod).using(
         sps.FlowForces,

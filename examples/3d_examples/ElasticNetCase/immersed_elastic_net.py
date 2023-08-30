@@ -58,7 +58,6 @@ def immersed_elastic_net_case(
             dx=flow_sim.dx,
             grid_dim=grid_dim,
             real_t=real_t,
-            num_threads=num_threads,
             forcing_grid_cls=sps.CosseratRodElementCentricForcingGrid,
         )
         rod_flow_interactor_list.append(rod_flow_interactor)

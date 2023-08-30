@@ -89,7 +89,6 @@ def tapered_arm_and_cylinder_flow_coupling(
         dx=flow_sim.dx,
         grid_dim=grid_dim,
         real_t=real_t,
-        num_threads=num_threads,
         forcing_grid_cls=sps.CosseratRodEdgeForcingGrid,
     )
     flow_body_interactors.append(cosserat_rod_flow_interactor)

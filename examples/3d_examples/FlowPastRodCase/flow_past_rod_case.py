@@ -120,7 +120,6 @@ def flow_past_rod_case(
         dx=flow_sim.dx,
         grid_dim=grid_dim,
         real_t=real_t,
-        num_threads=num_threads,
         forcing_grid_cls=sps.CosseratRodSurfaceForcingGrid,
         surface_grid_density_for_largest_element=surface_grid_density_for_largest_element,
     )

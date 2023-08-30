@@ -25,8 +25,6 @@ class RigidBodyFlowInteraction(PenaltyBoundaryForcing):
         real_t: type = np.float64,
         eul_grid_coord_shift: Optional[float] = None,
         interp_kernel_width: int = 2,
-        enable_eul_grid_forcing_reset: bool = False,
-        num_threads: int | bool = False,
         start_time: float = 0.0,
         interp_kernel_type: Literal["peskin", "cosine"] = "cosine",
         **forcing_grid_kwargs,

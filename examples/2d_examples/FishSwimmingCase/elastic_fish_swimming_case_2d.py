@@ -81,7 +81,6 @@ def elastic_fish_swimming_case(
         dx=flow_sim.dx,
         grid_dim=grid_dim,
         real_t=real_t,
-        num_threads=num_threads,
         forcing_grid_cls=sps.CosseratRodEdgeForcingGrid,
     )
     fish_sim.simulator.add_forcing_to(fish_sim.shearable_rod).using(

@@ -185,7 +185,6 @@ def flow_past_rod_case(
         grid_dim=grid_dim,
         forcing_grid_cls=sps.CosseratRodEdgeForcingGrid,
         real_t=real_t,
-        num_threads=num_threads,
     )
     flow_body_interactors.append(cosserat_rod_flow_interactor)
     flow_past_sim.add_forcing_to(flow_past_rod).using(
@@ -216,7 +215,6 @@ def flow_past_rod_case(
         grid_dim=grid_dim,
         forcing_grid_cls=sps.CosseratRodNodalForcingGrid,
         real_t=real_t,
-        num_threads=num_threads,
     )
     flow_body_interactors.append(top_wall_flow_interactor)
     bottom_wall_flow_interactor = sps.CosseratRodFlowInteraction(
@@ -229,7 +227,6 @@ def flow_past_rod_case(
         grid_dim=grid_dim,
         forcing_grid_cls=sps.CosseratRodNodalForcingGrid,
         real_t=real_t,
-        num_threads=num_threads,
     )
     flow_body_interactors.append(bottom_wall_flow_interactor)
     # ==================FLOW-ROD COMMUNICATOR SETUP END======

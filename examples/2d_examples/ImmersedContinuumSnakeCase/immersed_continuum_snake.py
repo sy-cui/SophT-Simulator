@@ -106,7 +106,6 @@ def immersed_continuum_snake_case(
         grid_dim=grid_dim,
         forcing_grid_cls=sps.CosseratRodElementCentricForcingGrid,
         real_t=real_t,
-        num_threads=num_threads,
     )
     if coupling_type == "two_way":
         snake_sim.add_forcing_to(snake_rod).using(
