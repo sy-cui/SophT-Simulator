@@ -1,12 +1,8 @@
 from .immersed_body_flow_interaction import ImmersedBodyFlowInteraction
-from sopht.simulator.immersed_body.immersed_boundary_interactions.ImmersedBoundaryInteraction import (
-    ImmersedBoundaryInteraction,
-)
-from sopht.simulator.immersed_body.immersed_boundary_interactions.PenaltyBoundaryForcing import (
-    PenaltyBoundaryForcing,
-)
 from .immersed_body_forcing_grid import ImmersedBodyForcingGrid
+from .immersed_boundary_interactions import *
 from .rigid_body import *
 from .cosserat_rod import *
 from .flow_forces import FlowForces
 from .cosserat_rod_cpp import *
+from .create_immersed_boundary_interactors import create_immersed_boundary_communicators
