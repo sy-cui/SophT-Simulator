@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sopht.simulator as sps
 import sopht.utils as spu
+from typing import Any, Dict
 
 
 def flow_past_cylinder_boundary_forcing_case(
@@ -14,6 +15,7 @@ def flow_past_cylinder_boundary_forcing_case(
     coupling_damping: float = -20,
     num_threads: int = 4,
     precision: str = "single",
+    use_direct_forcing: bool = True,
     save_diagnostic: bool = False,
 ) -> None:
     """
@@ -38,6 +40,7 @@ def flow_past_cylinder_boundary_forcing_case(
         kinematic_viscosity=nu,
         with_forcing=True,
         with_free_stream_flow=True,
+        with_velocity_correction=use_direct_forcing,
         real_t=real_t,
         num_threads=num_threads,
         time=0.0,
@@ -51,23 +54,33 @@ def flow_past_cylinder_boundary_forcing_case(
     base_length = 1.0
     density = 1e3
     cylinder = ea.Cylinder(start, direction, normal, base_length, cyl_radius, density)
-    # Since the cylinder is fixed, we dont add it to pyelastica simulator,
+    # Since the cylinder is fixed, we don't add it to pyelastica simulator,
     # and directly use it for setting up the flow interactor.
 
     # ==================FLOW-BODY COMMUNICATOR SETUP START======
     num_lag_nodes = 60
-    cylinder_flow_interactor = sps.RigidBodyFlowInteraction(
-        rigid_body=cylinder,
-        eul_grid_forcing_field=flow_sim.eul_grid_forcing_field,
-        eul_grid_velocity_field=flow_sim.velocity_field,
-        virtual_boundary_stiffness_coeff=coupling_stiffness,
-        virtual_boundary_damping_coeff=coupling_damping,
-        dx=flow_sim.dx,
-        grid_dim=grid_dim,
+    interactor_dict = {
+        "flow_sim": flow_sim,
+        "body_sim": cylinder,
+        "forcing_grid": sps.CircularCylinderForcingGrid,
+        "interaction_method": sps.DirectBoundaryForcing
+        if use_direct_forcing
+        else sps.PenaltyBoundaryForcing,
+    }
+    interactor_kwargs: Dict["str", Any] = {
+        "num_forcing_points": num_lag_nodes,
+    }
+    if use_direct_forcing:
+        interactor_kwargs["num_threads"] = num_threads
+    else:
+        interactor_kwargs["virtual_boundary_damping_coeff"] = coupling_damping
+        interactor_kwargs["virtual_boundary_stiffness_coeff"] = coupling_stiffness
+
+    cylinder_flow_interactor = sps.create_immersed_boundary_communicators(
+        interaction_pair_list=[interactor_dict],
         real_t=real_t,
-        forcing_grid_cls=sps.CircularCylinderForcingGrid,
-        num_forcing_points=num_lag_nodes,
-    )
+        **interactor_kwargs,
+    )[0]
     # ==================FLOW-BODY COMMUNICATOR SETUP END======
 
     # iterate
@@ -130,19 +143,33 @@ def flow_past_cylinder_boundary_forcing_case(
         dt = flow_sim.compute_stable_timestep()
 
         # compute flow forcing and timestep forcing
-        cylinder_flow_interactor.time_step(dt=dt)
+        if use_direct_forcing:
+            cylinder_flow_interactor.set_dt(dt=dt)
+        else:
+            cylinder_flow_interactor.time_step(dt=dt)
+
         cylinder_flow_interactor()
 
         # timestep the flow
         flow_sim.time_step(dt=dt, free_stream_velocity=velocity_free_stream)
+
+        if use_direct_forcing:
+            flow_sim.navier_stokes_correct_velocity_and_vorticity(
+                velocity_correction_field=cylinder_flow_interactor.eul_buffer_field
+            )
 
         # update timers
         foto_timer += dt
         data_timer += dt
 
     # compile video
+    video_name = "flow"
+    data_name = "drag_vs_time"
+    if use_direct_forcing:
+        video_name += "_direct"
+        data_name += "_direct"
     spu.make_video_from_image_series(
-        video_name="flow", image_series_name="snap", frame_rate=10
+        video_name=video_name, image_series_name="snap", frame_rate=10
     )
 
     plt.figure()
@@ -150,10 +177,10 @@ def flow_past_cylinder_boundary_forcing_case(
     plt.ylim([0.7, 1.7])
     plt.xlabel("Non-dimensional time")
     plt.ylabel("Drag coefficient, Cd")
-    plt.savefig("drag_vs_time.png")
+    plt.savefig(data_name + ".png")
     if save_diagnostic:
         np.savetxt(
-            "drag_vs_time.csv",
+            data_name + ".csv",
             np.c_[np.array(drag_coeffs_time), np.array(drag_coeffs)],
             delimiter=",",
         )
@@ -189,6 +216,7 @@ if __name__ == "__main__":
             grid_size=sim_grid_size,
             reynolds=reynolds,
             save_diagnostic=True,
+            use_direct_forcing=True,
             num_threads=num_threads,
         )
 
