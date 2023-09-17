@@ -5,7 +5,7 @@ from typing import Type, Optional, Literal
 from sopht.simulator.immersed_body.immersed_body_forcing_grid import (
     ImmersedBodyForcingGrid,
 )
-from sopht.simulator.immersed_body.ImmersedBoundaryInteraction import (
+from sopht.simulator.immersed_body.immersed_boundary_interactions.ImmersedBoundaryInteraction import (
     ImmersedBoundaryInteraction,
 )
 
@@ -83,7 +83,6 @@ class PenaltyBoundaryForcing(ImmersedBoundaryInteraction):
         super().__init__(
             grid_dim=grid_dim,
             dx=dx,
-            eul_grid_forcing_field=eul_grid_forcing_field,
             eul_grid_velocity_field=eul_grid_velocity_field,
             forcing_grid_cls=forcing_grid_cls,
             body_flow_forces=body_flow_forces,
@@ -103,6 +102,7 @@ class PenaltyBoundaryForcing(ImmersedBoundaryInteraction):
             grid_dim - 1
         )
 
+        self.eul_grid_forcing_field = eul_grid_forcing_field.view()
         self.lag_grid_position_mismatch_field = np.zeros_like(
             self.lag_grid_flow_velocity_field,
             dtype=real_t,

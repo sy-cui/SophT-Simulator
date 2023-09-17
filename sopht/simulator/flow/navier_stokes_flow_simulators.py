@@ -23,6 +23,7 @@ class UnboundedNavierStokesFlowSimulator2D(FlowSimulator):
         time: float = 0.0,
         with_forcing: bool = False,
         with_free_stream_flow: bool = False,
+        with_velocity_correction: bool = False,
         flow_density: float = 1.0,
         **kwargs,
     ) -> None:
@@ -47,6 +48,7 @@ class UnboundedNavierStokesFlowSimulator2D(FlowSimulator):
         self.cfl = cfl
         self.with_forcing = with_forcing
         self.with_free_stream_flow = with_free_stream_flow
+        self.with_velocity_correction = with_velocity_correction
         self.flow_density = flow_density
         self.penalty_zone_width = kwargs.get("penalty_zone_width", 2)
         super().__init__(
@@ -112,7 +114,7 @@ class UnboundedNavierStokesFlowSimulator2D(FlowSimulator):
                 fixed_grid_size=self.grid_size,
             )
         )
-        if self.with_forcing:
+        if self.with_forcing or self.with_velocity_correction:
             self._update_vorticity_from_velocity_forcing = (
                 spne.gen_update_vorticity_from_velocity_forcing_pyst_kernel_2d(
                     real_t=self.real_t,
@@ -201,6 +203,16 @@ class UnboundedNavierStokesFlowSimulator2D(FlowSimulator):
             vector_field=self.eul_grid_forcing_field, fixed_vals=[0.0] * self.grid_dim
         )
 
+    def navier_stokes_correct_velocity_and_vorticity(
+        self, velocity_correction_field: np.ndarray
+    ) -> None:
+        self._update_vorticity_from_velocity_forcing(
+            vorticity_field=self.vorticity_field,
+            velocity_forcing_field=velocity_correction_field,
+            prefactor=self.real_t(1.0 / (2 * self.dx)),
+        )
+        self.velocity_field[...] += velocity_correction_field
+
     def compute_stable_timestep(self, dt_prefac: float = 1.0) -> float:
         """Compute upper limit for stable time-stepping."""
         dt = compute_advection_diffusion_stable_timestep(
@@ -229,6 +241,7 @@ class UnboundedNavierStokesFlowSimulator3D(FlowSimulator):
         time: float = 0.0,
         with_forcing: bool = False,
         with_free_stream_flow: bool = False,
+        with_velocity_correction: bool = False,
         filter_vorticity: bool = False,
         flow_density: float = 1.0,
         poisson_solver_type: Literal[
@@ -261,6 +274,7 @@ class UnboundedNavierStokesFlowSimulator3D(FlowSimulator):
         self.cfl = cfl
         self.with_forcing = with_forcing
         self.with_free_stream_flow = with_free_stream_flow
+        self.with_velocity_correction = with_velocity_correction
         self.penalty_zone_width = kwargs.get("penalty_zone_width", 2)
         self.filter_vorticity = filter_vorticity
         if self.filter_vorticity:
@@ -496,6 +510,16 @@ class UnboundedNavierStokesFlowSimulator3D(FlowSimulator):
         self._set_field(
             vector_field=self.eul_grid_forcing_field, fixed_vals=[0.0] * self.grid_dim
         )
+
+    def navier_stokes_correct_velocity_and_vorticity(
+        self, velocity_correction_field: np.ndarray
+    ) -> None:
+        self._update_vorticity_from_velocity_forcing(
+            vorticity_field=self.vorticity_field,
+            velocity_forcing_field=velocity_correction_field,
+            prefactor=self.real_t(1.0 / (2 * self.dx)),
+        )
+        self.velocity_field[...] += velocity_correction_field
 
     def compute_stable_timestep(self, dt_prefac: float = 1.0) -> float:
         """Compute upper limit for stable time-stepping."""

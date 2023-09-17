@@ -1,0 +1,3 @@
+from .ImmersedBoundaryInteraction import ImmersedBoundaryInteraction
+from .DirectBoundaryForcing import DirectBoundaryForcing
+from .PenaltyBoundaryForcing import PenaltyBoundaryForcing

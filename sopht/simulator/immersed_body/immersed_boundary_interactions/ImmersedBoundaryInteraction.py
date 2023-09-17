@@ -20,7 +20,6 @@ class ImmersedBoundaryInteraction(ABC):
         self,
         grid_dim: int,
         dx: float,
-        eul_grid_forcing_field: np.ndarray,
         eul_grid_velocity_field: np.ndarray,
         forcing_grid_cls: Type[ImmersedBodyForcingGrid],
         body_flow_forces: np.ndarray,
@@ -41,9 +40,6 @@ class ImmersedBoundaryInteraction(ABC):
         dx: float
             Uniform flow grid spacing for all axes.
             This should be generated during initialization of the flow domain.
-        eul_grid_forcing_field: ndarray
-            Eulerian grid forcing field. This is usually initialized in the flow
-            simulator, and a view to the array is delegated here for IB interaction.
         eul_grid_velocity_field: ndarray
             Eulerian grid forcing field. This is usually initialized in the flow
             simulator, and a view to the array is delegated here for IB interaction.
@@ -91,7 +87,6 @@ class ImmersedBoundaryInteraction(ABC):
             eul_grid_coord_shift = real_t(dx / 2)
 
         # References to the flow and body properties
-        self.eul_grid_forcing_field = eul_grid_forcing_field.view()
         self.eul_grid_velocity_field = eul_grid_velocity_field.view()
         self.body_flow_forces = body_flow_forces.view()
         self.body_flow_torques = body_flow_torques.view()
