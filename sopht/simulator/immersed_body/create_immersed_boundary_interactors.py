@@ -121,12 +121,6 @@ def create_immersed_boundary_communicators(
                 f"or 'virtual_boundary_stiffness_coeff' in 'kwargs'."
             )
             interactor = PenaltyBoundaryForcing(
-                virtual_boundary_stiffness_coeff=kwargs.get(
-                    "virtual_boundary_stiffness_coeff", 0.0
-                ),
-                virtual_boundary_damping_coeff=kwargs.get(
-                    "virtual_boundary_damping_coeff", 0.0
-                ),
                 grid_dim=flow_simulator.grid_dim,
                 dx=flow_simulator.dx,
                 eul_grid_forcing_field=flow_simulator.eul_grid_forcing_field,
@@ -143,8 +137,6 @@ def create_immersed_boundary_communicators(
             )
 
         elif interaction_cls.__name__ == "DirectBoundaryForcing":
-            flow_density = kwargs.get("flow_density", real_t(1.0))
-            num_threads = kwargs.get("num_threads", 1)
             interactor = DirectBoundaryForcing(
                 grid_dim=flow_simulator.grid_dim,
                 dx=flow_simulator.dx,
@@ -154,8 +146,6 @@ def create_immersed_boundary_communicators(
                 body_flow_forces=body_flow_forces,
                 body_flow_torques=body_flow_torques,
                 real_t=flow_simulator.real_t,
-                flow_density=flow_density,
-                num_threads=num_threads,
                 eul_grid_coord_shift=eul_grid_coord_shift,
                 interp_kernel_width=interp_kernel_width,
                 start_time=start_time,
