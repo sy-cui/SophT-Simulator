@@ -204,14 +204,28 @@ class UnboundedNavierStokesFlowSimulator2D(FlowSimulator):
         )
 
     def navier_stokes_correct_velocity_and_vorticity(
-        self, velocity_correction_field: np.ndarray
+        self,
+        velocity_correction_field: np.ndarray,
+        div_free: bool = False,
     ) -> None:
         self._update_vorticity_from_velocity_forcing(
             vorticity_field=self.vorticity_field,
             velocity_forcing_field=velocity_correction_field,
             prefactor=self.real_t(1.0 / (2 * self.dx)),
         )
-        self.velocity_field[...] += velocity_correction_field
+        if div_free:
+            self._penalise_field_towards_boundary(field=self.vorticity_field)
+            self._unbounded_poisson_solver.solve(
+                solution_field=self.stream_func_field,
+                rhs_field=self.vorticity_field,
+            )
+            self._curl(
+                curl=self.velocity_field,
+                field=self.stream_func_field,
+                prefactor=self.real_t(0.5 / self.dx),
+            )
+        else:
+            self.velocity_field[...] += velocity_correction_field
 
     def compute_stable_timestep(self, dt_prefac: float = 1.0) -> float:
         """Compute upper limit for stable time-stepping."""
