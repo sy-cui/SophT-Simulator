@@ -34,6 +34,7 @@ class DirectBoundaryForcing(ImmersedBoundaryInteraction):
         interp_kernel_width: int = 2,
         start_time: float = 0.0,
         interp_kernel_type: Literal["peskin", "cosine"] = "cosine",
+        explicit_forcing: bool = True,
         **forcing_grid_kwargs,
     ):
         super().__init__(
@@ -63,6 +64,7 @@ class DirectBoundaryForcing(ImmersedBoundaryInteraction):
         )
         self.dt = 0.0
         self.flow_density = flow_density
+        self.explicit_forcing = explicit_forcing
 
         self.lag_grid_velocity_moment_field = np.zeros_like(
             self.lag_grid_body_velocity_field,
@@ -89,6 +91,7 @@ class DirectBoundaryForcing(ImmersedBoundaryInteraction):
         self.spd_inner_product = np.empty((self.grid_dim,), dtype=real_t)
         self.alpha = np.empty((self.grid_dim,), dtype=real_t)
         self.beta = np.empty((self.grid_dim,), dtype=real_t)
+        self.num_iters = 0
 
         self.sum_axes: Tuple[int, ...]
         if self.grid_dim == 2:
@@ -134,7 +137,10 @@ class DirectBoundaryForcing(ImmersedBoundaryInteraction):
         )
 
         # 4. Solve for velocity moment
-        self._solve_for_velocity_moment_via_conjugate_gradient()
+        if self.explicit_forcing:
+            self._solve_for_velocity_moment_via_explicit_forcing()
+        else:
+            self._solve_for_velocity_moment_via_conjugate_gradient()
 
         # 5. Compute velocity correction on Eulerian grid
         self.reset_field(self.eul_buffer_field)
@@ -150,8 +156,32 @@ class DirectBoundaryForcing(ImmersedBoundaryInteraction):
             self.flow_density * self.lag_grid_velocity_moment_field / self.dt
         )
 
-    def _solve_for_velocity_moment_via_conjugate_gradient(self):
+    def _solve_for_velocity_moment_via_explicit_forcing(self) -> None:
+        self.lag_grid_velocity_moment_field[...] = self.real_t(1.0)
+        self.reset_field(self.eul_buffer_field)
+        self.eul_lag_grid_communicator.lagrangian_to_eulerian_grid_interpolation_kernel(
+            eul_grid_field=self.eul_buffer_field,
+            lag_grid_field=self.lag_grid_velocity_moment_field,
+            interp_weights=self.interp_weights,
+            nearest_eul_grid_index_to_lag_grid=self.nearest_eul_grid_index_to_lag_grid,
+        )
+        self.eul_lag_grid_communicator.eulerian_to_lagrangian_grid_interpolation_kernel(
+            lag_grid_field=self.lag_grid_velocity_moment_field,
+            eul_grid_field=self.eul_buffer_field,
+            interp_weights=self.interp_weights,
+            nearest_eul_grid_index_to_lag_grid=self.nearest_eul_grid_index_to_lag_grid,
+        )
+        self.lag_grid_velocity_moment_field[
+            ...
+        ] = self.lag_grid_velocity_mismatch_field / (
+            self.lag_grid_velocity_moment_field
+        )
+
+    def _solve_for_velocity_moment_via_conjugate_gradient(self) -> None:
         """Solve for DD^T (dU dX) = U_b - Du*"""
+
+        self.num_iters = 0
+
         # Initial guess
         self.lag_grid_velocity_moment_field[...] = (
             self.lag_grid_velocity_mismatch_field
@@ -163,6 +193,7 @@ class DirectBoundaryForcing(ImmersedBoundaryInteraction):
         self.lag_grid_search_direction_field[...] = self.lag_grid_residual_field.copy()
 
         while np.amax(np.abs(self.lag_grid_residual_field)) > self.tol:
+            self.num_iters += 1
             # D^T p
             self.reset_field(self.eul_buffer_field)
             self.eul_lag_grid_communicator.lagrangian_to_eulerian_grid_interpolation_kernel(
@@ -221,7 +252,7 @@ class DirectBoundaryForcing(ImmersedBoundaryInteraction):
             self.lag_grid_velocity_mismatch_field - self.lag_grid_residual_field
         )
 
-    def reset_field(self, field):
+    def reset_field(self, field) -> None:
         self._set_field(
             vector_field=field, fixed_vals=[self.real_t(0.0)] * self.grid_dim
         )
